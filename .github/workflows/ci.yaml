@@ -1,0 +1,64 @@
+name: Build, package and test cJSON
+
+on:
+  push:
+    branches: [ "ino_dev" ]
+  pull_request:
+    branches: [ "ino_dev" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      
+      - name: Build RPM image
+        run: |
+          docker build \
+            -f docker/Dockerfile.build1 \
+            -t cjson-builder-image \
+            docker/
+
+        
+      - name: Extract RPM artifact
+        run: |
+          mkdir -p artifacts
+          docker run --rm \
+            -v $PWD/artifacts:/out \
+            cjson-builder-image
+
+      
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: cjson-rpm
+          path: artifacts/*.rpm
+
+      
+      - name: Build deploy image
+        run: |
+          docker build \
+            -f docker/Dockerfile.deploy \
+            -t cjson-deploy-image \
+            docker/
+
+      - name: Run example in deploy container
+        run: |
+          docker run --rm cjson-deploy-image
+
+      
+      - name: Build test image
+        run: |
+          docker build \
+            -f docker/Dockerfile.test \
+            -t cjson-test-image \
+            docker/
+
+      - name: Run tests
+        run: |
+          docker run --rm cjson-test-image
