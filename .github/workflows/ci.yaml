@@ -1,4 +1,4 @@
-name: Build, package and test cJSON
+name: Makefile CI
 
 on:
   push:
@@ -6,59 +6,47 @@ on:
   pull_request:
     branches: [ "ino_dev" ]
   workflow_dispatch:
+    inputs:
+      tags:
+        description: "opis"
+  
 
 jobs:
-  build-and-test:
+  build:
     runs-on: ubuntu-latest
 
+    container:
+      image: fedora:41
+
     steps:
-      
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
-      
-      - name: Build RPM image
+      - name: Install dependencies
         run: |
-          docker build \
-            -f docker/Dockerfile.build1 \
-            -t cjson-builder-image \
-            docker/
+          dnf install -y git cmake gcc gcc-c++ make ruby ruby-devel rpm-build rubygems
+          gem install --no-document fpm
 
-        
-      - name: Extract RPM artifact
+      - name: Checkout cJSON
         run: |
-          mkdir -p artifacts
-          docker run --rm \
-            -v $PWD/artifacts:/out \
-            cjson-builder-image
+          git clone https://github.com/DaveGamble/cJSON.git /app
 
-      
-      - name: Upload RPM
+      - name: Build cJSON
+        working-directory: /app
+        run: |
+          mkdir build && cd build
+          cmake ..
+          make
+          make DESTDIR=/tmp/install install
+
+      - name: Create RPM with fpm
+        working-directory: /app
+        run: |
+          fpm -s dir -t rpm \
+            -n mycjson \
+            -v 1.7.15 \
+            -C /tmp/install \
+            -p /app/mycjson.rpm
+
+      - name: Upload RPM artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cjson-rpm
-          path: artifacts/*.rpm
-
-      
-      - name: Build deploy image
-        run: |
-          docker build \
-            -f docker/Dockerfile.deploy \
-            -t cjson-deploy-image \
-            docker/
-
-      - name: Run example in deploy container
-        run: |
-          docker run --rm cjson-deploy-image
-
-      
-      - name: Build test image
-        run: |
-          docker build \
-            -f docker/Dockerfile.test \
-            -t cjson-test-image \
-            docker/
-
-      - name: Run tests
-        run: |
-          docker run --rm cjson-test-image
+          name: mycjson-rpm
+          path: /app/mycjson.rpm
