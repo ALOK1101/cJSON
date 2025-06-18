@@ -26,7 +26,7 @@ jobs:
 
       - name: Checkout cJSON
         run: |
-          git clone https://github.com/DaveGamble/cJSON.git /app
+          git clone https://github.com/ALOK1101/cJSON.git /app
 
       - name: Build cJSON
         working-directory: /app
